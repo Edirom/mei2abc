@@ -8,40 +8,57 @@
                 <xd:b>Author:</xd:b> Johannes Kepper</xd:p>
             <xd:p/>
             <xd:p>
-                This stylesheet converts MEI into abc. Right now, it's only capable
-                of rendering a single staff. 
+                This stylesheet converts MEI into abc.
             </xd:p>
         </xd:desc>
     </xd:doc>
     <xsl:output encoding="UTF-8" method="text"/>
-    <xsl:param name="includeIDs" select="true()"/>
-    <xsl:param name="showTstamps" select="false()"/>
+    <xsl:param name="includeIDs" select="false()" as="xs:boolean"/>
+    <xsl:param name="showTstamps" select="false()" as="xs:boolean"/>
+    
+    
+    <xsl:variable name="file" select="."/>
+    
     <xsl:template match="/">
-        <xsl:variable name="file" select="."/>
+        
         <xsl:variable name="firstMeasureID" select="($file//mei:measure)[1]/@xml:id"/>
         <xsl:variable name="lastMeasureID" select="($file//mei:measure)[last()]/@xml:id"/>
         <xsl:variable name="startDef" select="($file//mei:scoreDef)[1]"/>
         <xsl:message select="concat('firstMeasureID: ',$firstMeasureID)"/>
         <xsl:message select="local-name($startDef)"/>
-        <xsl:if test="count(distinct-values($file//@staff)) gt 1">
-            <xsl:message terminate="yes">File contains more than one staff. This cannot be parsed to abc in this version of mei2abc.xsl</xsl:message>
-        </xsl:if>
+        
         <xsl:variable name="abc">
-            <xsl:variable name="layers" select="distinct-values(('1',//mei:layer/@n))"/>
+            
+            
+            <xsl:variable name="voices" as="xs:string*">
+                <xsl:for-each select="$startDef//mei:staffDef">
+                    <xsl:variable name="staffN" select="@n" as="xs:string"/>
+                    <xsl:variable name="staffLayers" select="distinct-values(('1',$file//mei:staff[@n = $staffN]/mei:layer/@n))" as="xs:string*"/>
+                    <xsl:for-each select="$staffLayers">
+                        <xsl:value-of select="concat('staff',$staffN,'layer',.)"/>    
+                    </xsl:for-each>
+                </xsl:for-each>
+            </xsl:variable>
+            
+            
             <xsl:call-template name="getABCHead">
                 <xsl:with-param name="startDef" select="$startDef"/>
-                <xsl:with-param name="layers" select="$layers"/>
             </xsl:call-template>
-            <xsl:for-each select="$layers">
-                <xsl:variable name="layer" select="."/>
-                <xsl:value-of select="concat('[','V:L',$layer,'] ')"/>
+            
+            <xsl:for-each select="$voices">
+                
+                <xsl:variable name="staffN" select="substring-after(substring-before(.,'layer'),'staff')" as="xs:string"/>
+                <xsl:variable name="layerN" select="substring-after(.,'layer')" as="xs:string"/>
+                
+                <xsl:value-of select="concat('[V:',.,'] ')"/>
                 <xsl:apply-templates select="$file" mode="convertMEI">
-                    <xsl:with-param name="layer" select="$layer" tunnel="yes"/>
+                    <xsl:with-param name="staffN" select="$staffN" tunnel="yes"/>
+                    <xsl:with-param name="layerN" select="$layerN" tunnel="yes"/>
                 </xsl:apply-templates>
                 <xsl:value-of select="codepoints-to-string(13)"/>
                 
                 <!-- Lyrics lines -->
-                <xsl:if test="exists($file/mei:layer[@n = $layer or count($layers) = 1]//mei:syl)">
+                <!--<xsl:if test="exists($file/mei:layer[@n = $layer or count($layers) = 1]//mei:syl)">
                     <xsl:variable name="verses" select="distinct-values($file/mei:layer[@n = $layer or count($layers) = 1]//mei:verse/@n)"/>
                     <xsl:for-each select="$verses">
                         <xsl:value-of select="'w: '"/>
@@ -51,7 +68,7 @@
                         </xsl:apply-templates>
                         <xsl:value-of select="codepoints-to-string(13)"/>
                     </xsl:for-each>
-                </xsl:if>
+                </xsl:if>-->
             </xsl:for-each>
         </xsl:variable>
         <xsl:value-of select="replace($abc,'^[ \n]*|\s+$','','m')"/>
@@ -65,43 +82,62 @@
         <xsl:variable name="meter.unit" select="($startDef//@meter.unit)[last()]"/>
         <xsl:variable name="meter.sym" select="if($startDef//@meter.sym) then(($startDef//@meter.sym)[last()]) else('')"/>
         <xsl:variable name="key.sig" select="($startDef//@key.sig)[last()]"/>
+        
+        
         <xsl:variable name="clef.line" select="($startDef//@clef.line)[last()]"/>
         <xsl:variable name="clef.shape" select="($startDef//@clef.shape)[last()]"/>
+        <xsl:variable name="scoreGroups" as="xs:string*">
+            <xsl:for-each select="$startDef//mei:staffDef">
+                <xsl:variable name="staffN" select="@n" as="xs:string"/>
+                <xsl:variable name="staffLayers" select="distinct-values(('1',$file//mei:staff[@n = $staffN]/mei:layer/@n))" as="xs:string*"/>
+                <xsl:variable name="startBracket" select="if(count($staffLayers) gt 1) then('(') else('')" as="xs:string"/>
+                <xsl:variable name="endBracket" select="if(count($staffLayers) gt 1) then(')') else('')" as="xs:string"/>
+                <xsl:variable name="voiceRefs" as="xs:string*">
+                    <xsl:for-each select="$staffLayers">
+                        <xsl:value-of select="concat('staff',$staffN,'layer',.)"/>
+                    </xsl:for-each>
+                </xsl:variable>
+                <xsl:value-of select="concat($startBracket,string-join($voiceRefs,' '),$endBracket)"/>
+            </xsl:for-each>
+        </xsl:variable>
+        <xsl:variable name="staves" as="xs:string*">
+            <xsl:for-each select="$startDef//mei:staffDef">
+                <xsl:variable name="staffN" select="@n" as="xs:string"/>
+                <xsl:variable name="label" select="if(@label) then(@label) else('')" as="xs:string"/>
+                <xsl:variable name="label.abbr" select="if(@label.abbr) then(@label.abbr) else('')" as="xs:string"/>
+                <xsl:variable name="staffLayers" select="distinct-values(('1',$file//mei:staff[@n = $staffN]/mei:layer/@n))" as="xs:string*"/>
+                <xsl:variable name="clef" select="local:translateClef(@clef.line, @clef.shape)"/>
+                <xsl:for-each select="$staffLayers">
+                    <xsl:value-of select="concat('V:staff',$staffN,'layer',.,$clef,' name=',codepoints-to-string(34),$label,codepoints-to-string(34),' snm=',codepoints-to-string(34),$label.abbr,codepoints-to-string(34))"/>
+                </xsl:for-each>
+            </xsl:for-each>
+        </xsl:variable>
         M:<xsl:value-of select="local:translateMeter($meter.count,$meter.unit,$meter.sym)"/>
         K:<xsl:value-of select="local:translateKey($key.sig)"/>
-        <xsl:value-of select="local:translateClef($clef.line,$clef.shape)"/>
         %%barnumbers 1
         %%measurefirst <xsl:value-of select="(//mei:measure)[1]/@n"/>
         L:1/8
-        <xsl:variable name="prefixedLayers" as="xs:string*">
-            <xsl:for-each select="$layers">
-                <xsl:value-of select="concat('L',.)"/>
-            </xsl:for-each>
-        </xsl:variable>
-        <xsl:value-of select="concat('%%score (',string-join($prefixedLayers,' '),')',codepoints-to-string(13))"/>
-        <xsl:for-each select="$layers">
-            <xsl:value-of select="concat('V:L',.,codepoints-to-string(13))"/>
-        </xsl:for-each>
+        %%score <xsl:value-of select="concat(string-join($scoreGroups,' '),codepoints-to-string(13))"/>
+        <xsl:value-of select="concat(string-join($staves,codepoints-to-string(13)),codepoints-to-string(13))"/>
+        
     </xsl:template>
     <xsl:template match="mei:staffDef" mode="convertMEI">
         <xsl:value-of select="local:resolveDef(.,false())"/>
     </xsl:template>
     <xsl:template match="mei:scoreDef" mode="convertMEI">
-        <xsl:if test="preceding-sibling::mei:*">
+        <xsl:if test="preceding-sibling::mei:* or preceding::mei:section">
             <xsl:value-of select="local:resolveDef(.,false())"/>
         </xsl:if>
     </xsl:template>
     <xsl:template match="mei:measure" mode="convertMEI">
-        <xsl:param name="layer" tunnel="yes"/>
+        <xsl:param name="staffN" tunnel="yes"/>
+        <xsl:param name="layerN" tunnel="yes"/>
         <xsl:if test="@left">
             <xsl:apply-templates select="@left" mode="convertMEI"/>
         </xsl:if>
         <xsl:choose>
-            <xsl:when test="count(.//mei:layer) = 1 and $layer = '1'">
-                <xsl:apply-templates select=".//mei:layer/*" mode="convertMEI"/>
-            </xsl:when>
-            <xsl:when test="descendant::mei:layer/@n = $layer">
-                <xsl:apply-templates select=".//mei:layer[@n = $layer]/*" mode="convertMEI"/>
+            <xsl:when test=".//mei:staff[@n = $staffN]/mei:layer[@n = $layerN or ($layerN = '1' and count(parent::mei:staff/mei:layer) = 1)]">
+                <xsl:apply-templates select=".//mei:staff[@n = $staffN]/mei:layer[@n = $layerN or ($layerN = '1' and count(parent::mei:staff/mei:layer) = 1)]/*" mode="convertMEI"/>
             </xsl:when>
             <xsl:otherwise>
                 <xsl:call-template name="mSpace"/>
@@ -124,6 +160,16 @@
             <xsl:when test=". = 'single'">|</xsl:when>
         </xsl:choose>
     </xsl:template>
+    <xsl:template match="@left" mode="convertMEI">
+        <xsl:choose>
+            <xsl:when test=". = 'dbl'"> || </xsl:when>
+            <xsl:when test=". = 'end'"> |] </xsl:when>
+            <xsl:when test=". = 'rptstart'"> |: </xsl:when>
+            <xsl:when test=". = 'rptboth'"> :: </xsl:when>
+            <xsl:when test=". = 'rptend'"> :| </xsl:when>
+            <xsl:when test=". = 'single'"> | </xsl:when>
+        </xsl:choose>
+    </xsl:template>
     <xsl:template match="mei:beam" mode="convertMEI">
         <xsl:variable name="content">
             <xsl:apply-templates select="node()" mode="#current"/>
@@ -140,58 +186,58 @@
     </xsl:template>
     <xsl:template match="mei:mRest" mode="convertMEI">
         <xsl:variable name="id" select="@xml:id"/>
-        <xsl:variable name="meter.count" select="preceding::*[@meter.count]/@meter.count"/>
-        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit]/@meter.unit"/>
+        <xsl:variable name="meter.count" select="preceding::*[@meter.count][1]/@meter.count"/>
+        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit][1]/@meter.unit"/>
         <xsl:variable name="num">
             <xsl:choose>
-                <xsl:when test="$meter.unit = 4">
+                <xsl:when test="$meter.unit = '4'">
                     <xsl:value-of select="number($meter.count)*2"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 8">
+                <xsl:when test="$meter.unit = '8'">
                     <xsl:value-of select="number($meter.count)"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 2">
+                <xsl:when test="$meter.unit = '2'">
                     <xsl:value-of select="number($meter.count)*4"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 16">
+                <xsl:when test="$meter.unit = '16'">
                     <xsl:value-of select="concat($meter.count,'/2')"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 32">
+                <xsl:when test="$meter.unit = '32'">
                     <xsl:value-of select="concat($meter.count,'/4')"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 1">
+                <xsl:when test="$meter.unit = '1'">
                     <xsl:value-of select="number($meter.count)*8"/>
                 </xsl:when>
             </xsl:choose>
         </xsl:variable>
         <xsl:variable name="idref">
-            <xsl:if test="$includeIDs">
+            <!--<xsl:if test="$includeIDs">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),$id,codepoints-to-string(34),'!')"/>
-            </xsl:if>
+            </xsl:if>-->
         </xsl:variable>
         <xsl:value-of select="concat(' ',$idref,'z',$num)"/>
     </xsl:template>
     <xsl:template name="mSpace" match="mei:mSpace" mode="convertMEI">
-        <xsl:variable name="meter.count" select="preceding::*[@meter.count]/@meter.count"/>
-        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit]/@meter.unit"/>
+        <xsl:variable name="meter.count" select="preceding::*[@meter.count][1]/@meter.count"/>
+        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit][1]/@meter.unit"/>
         <xsl:variable name="num">
             <xsl:choose>
-                <xsl:when test="$meter.unit = 4">
+                <xsl:when test="$meter.unit = '4'">
                     <xsl:value-of select="number($meter.count)*2"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 8">
+                <xsl:when test="$meter.unit = '8'">
                     <xsl:value-of select="number($meter.count)"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 2">
+                <xsl:when test="$meter.unit = '2'">
                     <xsl:value-of select="number($meter.count)*4"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 16">
+                <xsl:when test="$meter.unit = '16'">
                     <xsl:value-of select="concat($meter.count,'/2')"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 32">
+                <xsl:when test="$meter.unit = '32'">
                     <xsl:value-of select="concat($meter.count,'/4')"/>
                 </xsl:when>
-                <xsl:when test="$meter.unit = 1">
+                <xsl:when test="$meter.unit = '1'">
                     <xsl:value-of select="number($meter.count)*8"/>
                 </xsl:when>
             </xsl:choose>
@@ -204,18 +250,48 @@
     </xsl:template>
     <xsl:template match="mei:fTrem" mode="convertMEI">
         <!--<xsl:value-of select="concat(codepoints-to-string(34),'fTrem',codepoints-to-string(34))"/>-->
-        <xsl:apply-templates select="node()" mode="#current"/>
+        
+        <xsl:choose>
+            <xsl:when test="@dur and @measperf">
+                <xsl:variable name="totalDur" select="@dur"/>
+                <xsl:variable name="perfDur" select="@measperf"/>
+                
+                <xsl:variable name="iterations" select="(number($perfDur) div number($totalDur) div 2) cast as xs:integer" as="xs:integer"/>
+                
+                <xsl:variable name="elem" select="." as="node()"/>
+               
+                
+                <xsl:variable name="string">
+                    <xsl:for-each select="(1 to $iterations)">
+                        <xsl:apply-templates select="$elem/child::mei:*" mode="#current">
+                            <xsl:with-param name="dur" select="$perfDur" tunnel="yes" as="xs:string?"/>
+                        </xsl:apply-templates>
+                    </xsl:for-each>
+                </xsl:variable>
+                
+                <xsl:value-of select="concat(' ',$string,' ')"/>
+                
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:apply-templates select="node()" mode="#current"/>
+            </xsl:otherwise>
+        </xsl:choose>
+        
     </xsl:template>
+    
     <xsl:template match="mei:chord" mode="convertMEI">
+        
+        <xsl:param name="dur" tunnel="yes" as="xs:string?"/>
+        
         <xsl:variable name="id" select="@xml:id"/>
         <xsl:variable name="tstamp" select="local:getTstamp(.) cast as xs:string"/>
         <xsl:variable name="slurStart">
             <xsl:for-each select="//mei:slur[substring(@startid,2) = $id]">(</xsl:for-each>
         </xsl:variable>
         <xsl:variable name="idref">
-            <xsl:if test="$includeIDs">
+            <!--<xsl:if test="$includeIDs">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),@xml:id,codepoints-to-string(34),'!')"/>
-            </xsl:if>
+            </xsl:if>-->
         </xsl:variable>
         <xsl:variable name="fermata">
             <xsl:if test="@fermata">
@@ -241,7 +317,7 @@
         </xsl:variable>
         <xsl:variable name="dur">
             <xsl:if test="@dur">
-                <xsl:value-of select="local:resolveDur(@dur,if(@dots) then(@dots) else(''))"/>
+                <xsl:value-of select="local:resolveDur(if($dur) then($dur) else(@dur),if(@dots) then(@dots) else(''))"/>
             </xsl:if>
         </xsl:variable>
         <xsl:variable name="content">
@@ -253,6 +329,7 @@
         <xsl:value-of select="concat(' ',$idref,$slurStart,$stemMod,$fermata,$dynam,'[',replace($content,' ',''),']',$dur,$slurEnd)"/>
     </xsl:template>
     <xsl:template match="mei:note" mode="convertMEI">
+        <xsl:param name="dur" tunnel="yes" as="xs:string?"/>
         <xsl:variable name="id" select="@xml:id"/>
         <xsl:variable name="tstamp" select="local:getTstamp(.) cast as xs:string"/>
         <xsl:variable name="measure" select="ancestor::mei:measure"/>
@@ -260,9 +337,9 @@
             <xsl:for-each select="//mei:slur[substring(@startid,2) = $id]">(</xsl:for-each>
         </xsl:variable>
         <xsl:variable name="idref">
-            <xsl:if test="$includeIDs and not(parent::mei:chord)">
+            <!--<xsl:if test="$includeIDs and not(parent::mei:chord)">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),@xml:id,codepoints-to-string(34),'!')"/>
-            </xsl:if>
+            </xsl:if>-->
         </xsl:variable>
         <xsl:variable name="graceStart">
             <xsl:if test="@grace and not(preceding-sibling::mei:note[1]/@grace)">
@@ -357,7 +434,7 @@
         </xsl:variable>
         <xsl:variable name="dur">
             <xsl:if test="not(parent::mei:chord/@dur)">
-                <xsl:value-of select="local:resolveDur(@dur,if(@dots) then(@dots) else(''))"/>
+                <xsl:value-of select="local:resolveDur(if($dur) then($dur) else(@dur),if(@dots) then(@dots) else(''))"/>
             </xsl:if>
         </xsl:variable>
         <xsl:variable name="tie">
@@ -370,17 +447,17 @@
             <xsl:if test="@grace and not(following-sibling::mei:note[1]/@grace)">}</xsl:if>
         </xsl:variable>
         <xsl:variable name="tstamp">
-            <xsl:if test="$showTstamps">
+            <!--<xsl:if test="$showTstamps">
                 <xsl:value-of select="concat(codepoints-to-string(34),$tstamp,codepoints-to-string(34))"/>
-            </xsl:if>
+            </xsl:if>-->
         </xsl:variable>
         <xsl:value-of select="concat(' ',$idref,$tstamp,$hairpin,$graceStart,$slurStart,$stemMod,$dynam,$trill,$fermata,$artic,$accid,$pitch,$dur,$tie,$slurEnd,$graceEnd)"/>
     </xsl:template>
     <xsl:template match="mei:rest" mode="convertMEI">
         <xsl:variable name="idref">
-            <xsl:if test="$includeIDs">
+            <!--<xsl:if test="$includeIDs">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),@xml:id,codepoints-to-string(34),'!')"/>
-            </xsl:if>
+            </xsl:if>-->
         </xsl:variable>
         <xsl:variable name="fermata">
             <xsl:if test="@fermata">
@@ -397,8 +474,9 @@
     
     <!-- mode: lyrics -->
     <xsl:template match="mei:measure" mode="lyrics">
-        <xsl:param name="layer" tunnel="yes"/>
-        <xsl:apply-templates select="//mei:layer[@n = $layer]" mode="lyrics"/>
+        <xsl:param name="staffN" tunnel="yes"/>
+        <xsl:param name="layerN" tunnel="yes"/>
+        <xsl:apply-templates select="//mei:staff[@n = $staffN]/mei:layer[@n = $layerN]" mode="lyrics"/>
     </xsl:template>
     <xsl:template match="mei:note[not(parent::mei:chord) and not(@grace)] | mei:chord" mode="lyrics">
         <xsl:param name="verse" tunnel="yes"/>
@@ -602,7 +680,7 @@
     <xsl:function name="local:translateMeter">
         <xsl:param name="meter.count" as="xs:string"/>
         <xsl:param name="meter.unit" as="xs:string"/>
-        <xsl:param name="meter.sym" as="xs:string"/>
+        <xsl:param name="meter.sym" as="xs:string?"/>
         <xsl:choose>
             <xsl:when test="$meter.sym = 'common'">C</xsl:when>
             <xsl:when test="$meter.sym = 'cut'">C|</xsl:when>
@@ -617,13 +695,30 @@
     <xsl:function name="local:translateClef">
         <xsl:param name="clef.line" as="xs:string"/>
         <xsl:param name="clef.shape" as="xs:string"/>
-        <xsl:value-of select="concat(' clef=',upper-case($clef.shape),$clef.line)"/>
+        
+        <xsl:variable name="clefDef" select="concat(upper-case($clef.shape),$clef.line)"/>
+        <xsl:variable name="clefString">
+            <xsl:choose>
+                <xsl:when test="$clefDef = 'G2'">treble</xsl:when>
+                <xsl:when test="$clefDef = 'F4'">bass</xsl:when>
+                <xsl:when test="$clefDef = 'F3'">baritone</xsl:when>
+                <xsl:when test="$clefDef = 'C4'">tenor</xsl:when>
+                <xsl:when test="$clefDef = 'C3'">alto</xsl:when>
+                <xsl:when test="$clefDef = 'C2'">mezzosoprano</xsl:when>
+                <xsl:when test="$clefDef = 'C1'">soprano</xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="$clefDef"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:variable>
+        
+        <xsl:value-of select="concat(' clef=',$clefString)"/>
     </xsl:function>
     <xsl:function name="local:getTstamp">
         <xsl:param name="elem"/>
         <xsl:variable name="eventid" select="$elem/@xml:id"/>
         <xsl:variable name="layer" select="$elem/ancestor::mei:layer"/>
-        <xsl:variable name="meter.unit" select="$elem/preceding::*/@meter.unit"/>
+        <xsl:variable name="meter.unit" select="$elem/preceding::*[@meter.unit][1]/@meter.unit"/>
         
         <!--  Given a context layer and an @xml:id of a note or rest, 
                     return the timestamp of the note or rest.-->
