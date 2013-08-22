@@ -13,6 +13,12 @@
         </xd:desc>
     </xd:doc>
     <xsl:output encoding="UTF-8" method="text"/>
+    
+    <xd:doc scope="component">
+        <xd:desc>
+            <xd:p>If set to true(), xml:ids from notes, chords and rests are included as comments in the abc string.</xd:p>
+        </xd:desc>
+    </xd:doc>
     <xsl:param name="includeIDs" select="false()" as="xs:boolean"/>
     <xsl:param name="showTstamps" select="false()" as="xs:boolean"/>
     
@@ -312,7 +318,7 @@
         <xsl:variable name="dynam">
             <xsl:variable name="dyn" select="ancestor::mei:measure/mei:dynam[@tstamp = $tstamp]"/>
             <xsl:for-each select="$dyn">
-                <xsl:value-of select="concat('!',($dyn/text())[1],'!')"/>
+                <xsl:value-of select="concat('!',(replace($dyn/text(),'[o:\.rnitez]+',''))[1],'!')"/>
             </xsl:for-each>
         </xsl:variable>
         <xsl:variable name="dur">
@@ -365,7 +371,7 @@
             <xsl:if test="not(ancestor::mei:chord)">
                 <xsl:variable name="dyn" select="ancestor::mei:measure/mei:dynam[@tstamp = $tstamp]"/>
                 <xsl:for-each select="$dyn">
-                    <xsl:value-of select="concat('!',replace(string-join($dyn//text(), ''), '\s*(.+)\s*', '$1'),'!')"/>
+                    <xsl:value-of select="concat('!',replace(replace(string-join($dyn//text(), ''), '\s*(.+)\s*', '$1'),'[o:\.rnitez]+',''),'!')"/>
                 </xsl:for-each>
             </xsl:if>
         </xsl:variable>
