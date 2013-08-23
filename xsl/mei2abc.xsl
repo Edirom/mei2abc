@@ -13,49 +13,144 @@
         </xd:desc>
     </xd:doc>
     <xsl:output encoding="UTF-8" method="text"/>
-    
     <xd:doc scope="component">
         <xd:desc>
             <xd:p>If set to true(), xml:ids from notes, chords and rests are included as comments in the abc string.</xd:p>
         </xd:desc>
     </xd:doc>
-    <xsl:param name="includeIDs" select="false()" as="xs:boolean"/>
-    <xsl:param name="showTstamps" select="false()" as="xs:boolean"/>
+    <xsl:param name="includeIDs" select="'true'" as="xs:string"/>
+    <xsl:param name="showTstamps" select="'false'" as="xs:string"/>
+    <xsl:param name="showStemDir" select="'false'" as="xs:string"/>
+    <xsl:param name="showMeasureNumbers" select="'false'" as="xs:string"/>
     
+    <xsl:variable name="internalIncludeIDs" select="if($includeIDs = 'true')  then(true()) else(false())" as="xs:boolean"/>
+    <xsl:variable name="internalShowTstamps" select="if($showTstamps = 'true')  then(true()) else(false())" as="xs:boolean"/>
+    <xsl:variable name="internalShowStemDir" select="if($showStemDir = 'true')  then(true()) else(false())" as="xs:boolean"/>
+    <xsl:variable name="internalShowMeasureNumbers" select="if($showMeasureNumbers = 'true') then(true()) else(false())" as="xs:boolean"/>
     
     <xsl:variable name="file" select="."/>
     
+    <!--<xsl:variable name="slurStarts" as="xs:string*">
+        <xsl:for-each select="//mei:slur">
+            <xsl:choose>
+                <xsl:when test="@startid">
+                    <xsl:variable name="startElem" select="$file/id(substring(@startid,2))" as="node()?"/>
+                    <xsl:if test="exists($startElem) and local-name($startElem) = ('note','chord')">
+                        <xsl:value-of select="substring(@startid,2)"/>
+                    </xsl:if>
+                </xsl:when>
+                <xsl:when test="@tstamp and @staff">
+                    <xsl:variable name="measure" select="parent::mei:measure" as="node()"/>
+                    <xsl:variable name="tstamp" select="@tstamp" as="xs:string"/>
+                    <xsl:variable name="staffN" select="@staff" as="xs:string"/>
+                    <xsl:variable name="layers" select="$measure/mei:staff[@n = $staffN]/mei:layer" as="node()*"/>
+                    <xsl:variable name="targets" as="xs:string()*">
+                        <xsl:for-each select="$layers">
+                            
+                            <xsl:variable name="def" select="preceding::mei:*[@meter.unit and @meter.count and (local-name() = 'scoreDef' or @n = $staffN)][1]"/>
+                            
+                            <xsl:variable name="tstamp" select="local:getTstampByDef(.,$def)"/>
+                            
+                            <xsl:variable name="elems" select="descendant::mei:mRest[@dur] | descendant::mei:space[@dur] | descendant::mei:note[@dur and not(ancestor::mei:tuplet)] | descendant::mei:tuplet | descendant::mei:rest | descendant::mei:chord[@dur and not(.//mei:note[@dur])]"/>
+                            
+                            <xsl:variable name="tstamps" as="xs:string*">
+                                <xsl:for-each select="$elems">
+                                    <xsl:variable name="elem" select="."/>
+                                    <xsl:value-of select="local:getTstampByDef($elem,$def)"/>
+                                </xsl:for-each>
+                            </xsl:variable>
+                            
+                            <xsl:variable name="index" select="index-of($tstamps,$tstamp)"/>
+                            
+                            <xsl:variable name="rightElem" select="$elems[$index]" as="node()?"/>
+                            
+                            <xsl:if test="exists($rightElem) and local-name($rightElem) = ('note','chord')">
+                                <xsl:value-of select="$rightElem/@xml:id"/>    
+                            </xsl:if>
+                            
+                        </xsl:for-each>
+                    </xsl:variable>
+                    <xsl:if test="count($targets) gt 0">
+                        <xsl:value-of select="$targets[1]"/>    
+                    </xsl:if>
+                </xsl:when>
+            </xsl:choose>
+            
+        </xsl:for-each>
+    </xsl:variable>-->
+    
+    <!--<xsl:variable name="slurEnds" as="xs:string*">
+        <xsl:for-each select="//mei:slur">
+            <xsl:choose>
+                <xsl:when test="@endid">
+                    <xsl:variable name="endElem" select="$file/id(substring(@endid,2))" as="node()?"/>
+                    <xsl:if test="exists($endElem) and local-name($endElem) = ('note','chord')">
+                        <xsl:value-of select="substring(@endid,2)"/>
+                    </xsl:if>
+                </xsl:when>
+                <xsl:when test="@tstamp2 and @staff">
+                    <xsl:variable name="startMeasure" select="parent::mei:measure" as="node()"/>
+                    <xsl:variable name="range" select="number(substring-before(@tstamp2,'m+'))" as="xs:double"/>
+                    <xsl:variable name="measure" select="if($range gt 0) then($startMeasure/following::meiMeasure[$range]) else($startMeasure)" as="node()"/>
+                    <xsl:variable name="tstamp" select="substring-after(@tstamp2,'m+')" as="xs:string"/>
+                    <xsl:variable name="staffN" select="@staff" as="xs:string"/>
+                    <xsl:variable name="layers" select="$measure/mei:staff[@n = $staffN]/mei:layer" as="node()*"/>
+                    <xsl:variable name="targets" as="xs:string()*">
+                        <xsl:for-each select="$layers">
+                            
+                            <xsl:variable name="def" select="preceding::mei:*[@meter.unit and @meter.count and (local-name() = 'scoreDef' or @n = $staffN)][1]"/>
+                            
+                            <xsl:variable name="tstamp" select="local:getTstampByDef(.,$def)"/>
+                            
+                            <xsl:variable name="elems" select="descendant::mei:mRest[@dur] | descendant::mei:space[@dur] | descendant::mei:note[@dur and not(ancestor::mei:tuplet)] | descendant::mei:tuplet | descendant::mei:rest | descendant::mei:chord[@dur and not(.//mei:note[@dur])]"/>
+                            
+                            <xsl:variable name="tstamps" as="xs:string*">
+                                <xsl:for-each select="$elems">
+                                    <xsl:variable name="elem" select="."/>
+                                    <xsl:value-of select="local:getTstampByDef($elem,$def)"/>
+                                </xsl:for-each>
+                            </xsl:variable>
+                            
+                            <xsl:variable name="index" select="index-of($tstamps,$tstamp)"/>
+                            
+                            <xsl:variable name="rightElem" select="$elems[$index]" as="node()?"/>
+                            
+                            <xsl:if test="exists($rightElem) and local-name($rightElem) = ('note','chord')">
+                                <xsl:value-of select="$rightElem/@xml:id"/>    
+                            </xsl:if>
+                            
+                        </xsl:for-each>
+                    </xsl:variable>
+                    <xsl:if test="count($targets) gt 0">
+                        <xsl:value-of select="$targets[1]"/>    
+                    </xsl:if>
+                </xsl:when>
+            </xsl:choose>
+            
+        </xsl:for-each>
+    </xsl:variable>-->
     <xsl:template match="/">
-        
         <xsl:variable name="firstMeasureID" select="($file//mei:measure)[1]/@xml:id"/>
         <xsl:variable name="lastMeasureID" select="($file//mei:measure)[last()]/@xml:id"/>
         <xsl:variable name="startDef" select="($file//mei:scoreDef)[1]"/>
         <xsl:message select="concat('firstMeasureID: ',$firstMeasureID)"/>
         <xsl:message select="local-name($startDef)"/>
-        
         <xsl:variable name="abc">
-            
-            
             <xsl:variable name="voices" as="xs:string*">
                 <xsl:for-each select="$startDef//mei:staffDef">
                     <xsl:variable name="staffN" select="@n" as="xs:string"/>
                     <xsl:variable name="staffLayers" select="distinct-values(('1',$file//mei:staff[@n = $staffN]/mei:layer/@n))" as="xs:string*"/>
                     <xsl:for-each select="$staffLayers">
-                        <xsl:value-of select="concat('staff',$staffN,'layer',.)"/>    
+                        <xsl:value-of select="concat('staff',$staffN,'layer',.)"/>
                     </xsl:for-each>
                 </xsl:for-each>
             </xsl:variable>
-            
-            
             <xsl:call-template name="getABCHead">
                 <xsl:with-param name="startDef" select="$startDef"/>
             </xsl:call-template>
-            
             <xsl:for-each select="$voices">
-                
                 <xsl:variable name="staffN" select="substring-after(substring-before(.,'layer'),'staff')" as="xs:string"/>
                 <xsl:variable name="layerN" select="substring-after(.,'layer')" as="xs:string"/>
-                
                 <xsl:value-of select="concat('[V:',.,'] ')"/>
                 <xsl:apply-templates select="$file" mode="convertMEI">
                     <xsl:with-param name="staffN" select="$staffN" tunnel="yes"/>
@@ -88,8 +183,6 @@
         <xsl:variable name="meter.unit" select="($startDef//@meter.unit)[last()]"/>
         <xsl:variable name="meter.sym" select="if($startDef//@meter.sym) then(($startDef//@meter.sym)[last()]) else('')"/>
         <xsl:variable name="key.sig" select="($startDef//@key.sig)[last()]"/>
-        
-        
         <xsl:variable name="clef.line" select="($startDef//@clef.line)[last()]"/>
         <xsl:variable name="clef.shape" select="($startDef//@clef.shape)[last()]"/>
         <xsl:variable name="scoreGroups" as="xs:string*">
@@ -112,7 +205,7 @@
                 <xsl:variable name="label" select="if(@label) then(@label) else('')" as="xs:string"/>
                 <xsl:variable name="label.abbr" select="if(@label.abbr) then(@label.abbr) else('')" as="xs:string"/>
                 <xsl:variable name="staffLayers" select="distinct-values(('1',$file//mei:staff[@n = $staffN]/mei:layer/@n))" as="xs:string*"/>
-                <xsl:variable name="clef" select="local:translateClef(@clef.line, @clef.shape)"/>
+                <xsl:variable name="clef" select="if(@clef.line and @clef.shape)then(local:translateClef(@clef.line, @clef.shape)) else(' clef=none')"/>
                 <xsl:for-each select="$staffLayers">
                     <xsl:value-of select="concat('V:staff',$staffN,'layer',.,$clef,' name=',codepoints-to-string(34),$label,codepoints-to-string(34),' snm=',codepoints-to-string(34),$label.abbr,codepoints-to-string(34))"/>
                 </xsl:for-each>
@@ -120,12 +213,13 @@
         </xsl:variable>
         M:<xsl:value-of select="local:translateMeter($meter.count,$meter.unit,$meter.sym)"/>
         K:<xsl:value-of select="local:translateKey($key.sig)"/>
-        %%barnumbers 1
-        %%measurefirst <xsl:value-of select="(//mei:measure)[1]/@n"/>
+        <xsl:if test="$internalShowMeasureNumbers">
+            %%barnumbers 1
+            %%measurefirst <xsl:value-of select="(//mei:measure)[1]/@n"/>    
+        </xsl:if>
         L:1/8
         %%score <xsl:value-of select="concat(string-join($scoreGroups,' '),codepoints-to-string(13))"/>
         <xsl:value-of select="concat(string-join($staves,codepoints-to-string(13)),codepoints-to-string(13))"/>
-        
     </xsl:template>
     <xsl:template match="mei:staffDef" mode="convertMEI">
         <xsl:value-of select="local:resolveDef(.,false())"/>
@@ -217,9 +311,9 @@
             </xsl:choose>
         </xsl:variable>
         <xsl:variable name="idref">
-            <!--<xsl:if test="$includeIDs">
+            <xsl:if test="$internalIncludeIDs = true()">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),$id,codepoints-to-string(34),'!')"/>
-            </xsl:if>-->
+            </xsl:if>
         </xsl:variable>
         <xsl:value-of select="concat(' ',$idref,'z',$num)"/>
     </xsl:template>
@@ -254,54 +348,148 @@
         <!--<xsl:value-of select="concat(codepoints-to-string(34),'bTrem',codepoints-to-string(34))"/>-->
         <xsl:apply-templates select="node()" mode="#current"/>
     </xsl:template>
+    <xsl:template match="mei:mRpt" mode="convertMEI">
+        <!-- this resolves mRpts…
+            
+            <xsl:variable name="staffN" select="ancestor::mei:staff/@n"/>
+        <xsl:variable name="layerN" select="ancestor::mei:layer/@n"/>
+        <xsl:variable name="targetLayer" select="ancestor::mei:measure/preceding::mei:measure[1]/mei:staff[@n = $staffN]/mei:layer[@n = $layerN or count(parent::mei:staff/mei:layer) = 1]"/>
+        
+        <xsl:value-of select="'"_mRpt"'"/>
+        <xsl:apply-templates select="$targetLayer" mode="#current"/>-->
+        <xsl:variable name="meter.count" select="preceding::*[@meter.count][1]/@meter.count"/>
+        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit][1]/@meter.unit"/>
+        <xsl:variable name="num">
+            <xsl:choose>
+                <xsl:when test="$meter.unit = '4'">
+                    <xsl:value-of select="number($meter.count)*2"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '8'">
+                    <xsl:value-of select="number($meter.count)"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '2'">
+                    <xsl:value-of select="number($meter.count)*4"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '16'">
+                    <xsl:value-of select="concat($meter.count,'/2')"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '32'">
+                    <xsl:value-of select="concat($meter.count,'/4')"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '1'">
+                    <xsl:value-of select="number($meter.count)*8"/>
+                </xsl:when>
+            </xsl:choose>
+        </xsl:variable>
+        <xsl:value-of select="concat(' &#34;//;m&#34;y',$num)"/>
+    </xsl:template>
+    <xsl:template match="mei:halfmRpt" mode="convertMEI">
+        <xsl:variable name="meter.count" select="preceding::*[@meter.count][1]/@meter.count"/>
+        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit][1]/@meter.unit"/>
+        <xsl:variable name="num">
+            <xsl:choose>
+                <xsl:when test="$meter.unit = '4'">
+                    <xsl:value-of select="number($meter.count)*2"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '8'">
+                    <xsl:value-of select="number($meter.count)"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '2'">
+                    <xsl:value-of select="number($meter.count)*4"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '16'">
+                    <xsl:value-of select="concat($meter.count,'/2')"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '32'">
+                    <xsl:value-of select="concat($meter.count,'/4')"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '1'">
+                    <xsl:value-of select="number($meter.count)*8"/>
+                </xsl:when>
+            </xsl:choose>
+        </xsl:variable>
+        <xsl:value-of select="concat(' &#34;//;hm&#34;y',($num div 2))"/>
+    </xsl:template>
+    <xsl:template match="mei:beatRpt" mode="convertMEI">
+        <xsl:variable name="meter.unit" select="preceding::*[@meter.unit][1]/@meter.unit"/>
+        <xsl:variable name="num">
+            <xsl:choose>
+                <xsl:when test="$meter.unit = '4'">
+                    <xsl:value-of select="'2'"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '8'">
+                    <xsl:value-of select="'1'"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '2'">
+                    <xsl:value-of select="'4'"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '16'">
+                    <xsl:value-of select="'1/2'"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '32'">
+                    <xsl:value-of select="'1/4'"/>
+                </xsl:when>
+                <xsl:when test="$meter.unit = '1'">
+                    <xsl:value-of select="'8'"/>
+                </xsl:when>
+            </xsl:choose>
+        </xsl:variable>
+        <xsl:value-of select="concat(' &#34;//;b&#34;y',$num)"/>
+    </xsl:template>
     <xsl:template match="mei:fTrem" mode="convertMEI">
         <!--<xsl:value-of select="concat(codepoints-to-string(34),'fTrem',codepoints-to-string(34))"/>-->
-        
         <xsl:choose>
-            <xsl:when test="@dur and @measperf">
-                <xsl:variable name="totalDur" select="@dur"/>
+            <xsl:when test="count(distinct-values(child::*/@dur)) = 1 and @measperf">
+                <xsl:variable name="totalDur" select="child::*[1]/@dur"/>
                 <xsl:variable name="perfDur" select="@measperf"/>
-                
                 <xsl:variable name="iterations" select="(number($perfDur) div number($totalDur) div 2) cast as xs:integer" as="xs:integer"/>
-                
                 <xsl:variable name="elem" select="." as="node()"/>
-               
-                
                 <xsl:variable name="string">
-                    <xsl:for-each select="(1 to $iterations)">
+                    <xsl:for-each select="(1 to $iterations - 1)">
                         <xsl:apply-templates select="$elem/child::mei:*" mode="#current">
                             <xsl:with-param name="dur" select="$perfDur" tunnel="yes" as="xs:string?"/>
                         </xsl:apply-templates>
                     </xsl:for-each>
+                    <xsl:apply-templates select="$elem/child::mei:*[1]" mode="#current">
+                        <xsl:with-param name="dur" select="$perfDur" tunnel="yes" as="xs:string?"/>
+                    </xsl:apply-templates>
+                    <xsl:value-of select="'&#34;&gt;&gt;&#34;'"/>
+                    <xsl:apply-templates select="$elem/child::mei:*[2]" mode="#current">
+                        <xsl:with-param name="dur" select="$perfDur" tunnel="yes" as="xs:string?"/>
+                    </xsl:apply-templates>
                 </xsl:variable>
-                
-                <xsl:value-of select="concat(' ',$string,' ')"/>
-                
+                <xsl:value-of select="concat(' &#34;&lt;&lt;&#34;&#34;_fT&#34;',replace($string,'\s+',''),' ')"/>
             </xsl:when>
             <xsl:otherwise>
                 <xsl:apply-templates select="node()" mode="#current"/>
             </xsl:otherwise>
         </xsl:choose>
-        
     </xsl:template>
-    
     <xsl:template match="mei:chord" mode="convertMEI">
-        
         <xsl:param name="dur" tunnel="yes" as="xs:string?"/>
-        
         <xsl:variable name="id" select="@xml:id"/>
         <xsl:variable name="tstamp" select="local:getTstamp(.) cast as xs:string"/>
         <xsl:variable name="slurStart">
             <xsl:for-each select="//mei:slur[substring(@startid,2) = $id]">(</xsl:for-each>
         </xsl:variable>
         <xsl:variable name="idref">
-            <!--<xsl:if test="$includeIDs">
+            <xsl:if test="$internalIncludeIDs">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),@xml:id,codepoints-to-string(34),'!')"/>
-            </xsl:if>-->
+            </xsl:if>
+        </xsl:variable>
+        <xsl:variable name="stemDir">
+            <xsl:if test="$internalShowStemDir and @stem.dir">
+                <xsl:value-of select="concat('&#34;',if(@stem.dir='up') then('⇡') else('⇣'),'&#34;')"/>
+            </xsl:if>
         </xsl:variable>
         <xsl:variable name="fermata">
             <xsl:if test="@fermata">
                 <xsl:value-of select="concat('!',if(@fermata = 'above') then('fermata') else('invertedfermata'),'!')"/>
+            </xsl:if>
+        </xsl:variable>
+        <xsl:variable name="mark">
+            <xsl:if test="child::mei:note/@added">
+                <xsl:value-of select="'!mark!'"/>
             </xsl:if>
         </xsl:variable>
         <xsl:variable name="stemMod">
@@ -314,6 +502,15 @@
                 </xsl:variable>
                 <xsl:value-of select="concat('!',$slashes,'!')"/>
             </xsl:if>
+        </xsl:variable>
+        <xsl:variable name="artic">
+            <xsl:choose>
+                <xsl:when test="@artic = 'stacc'">.</xsl:when>
+                <xsl:when test="@artic = 'dot'">.</xsl:when>
+                <xsl:when test="@artic = 'acc'">!accent!</xsl:when>
+                <xsl:when test="@artic = 'stroke'">!breath!</xsl:when>
+                <xsl:when test="@artic = 'marc'">!breath!</xsl:when>
+            </xsl:choose>
         </xsl:variable>
         <xsl:variable name="dynam">
             <xsl:variable name="dyn" select="ancestor::mei:measure/mei:dynam[@tstamp = $tstamp]"/>
@@ -332,40 +529,57 @@
         <xsl:variable name="slurEnd">
             <xsl:for-each select="//mei:slur[substring(@endid,2) = $id]">)</xsl:for-each>
         </xsl:variable>
-        <xsl:value-of select="concat(' ',$idref,$slurStart,$stemMod,$fermata,$dynam,'[',replace($content,' ',''),']',$dur,$slurEnd)"/>
+        <xsl:variable name="tie">
+            <xsl:if test="starts-with(@tie,'i') or starts-with(@tie,'m')">-</xsl:if>
+        </xsl:variable>
+        <xsl:value-of select="concat(' ',$idref,$slurStart,$stemDir,$mark,$artic,$stemMod,$fermata,$dynam,'[',replace($content,' ',''),']',$dur,$slurEnd,$tie)"/>
     </xsl:template>
     <xsl:template match="mei:note" mode="convertMEI">
         <xsl:param name="dur" tunnel="yes" as="xs:string?"/>
         <xsl:variable name="id" select="@xml:id"/>
         <xsl:variable name="tstamp" select="local:getTstamp(.) cast as xs:string"/>
         <xsl:variable name="measure" select="ancestor::mei:measure"/>
+        <xsl:variable name="staffN" select="ancestor::mei:staff/@n"/>
+        <xsl:variable name="layerN" select="ancestor::mei:layer/@n"/>
         <xsl:variable name="slurStart">
             <xsl:for-each select="//mei:slur[substring(@startid,2) = $id]">(</xsl:for-each>
         </xsl:variable>
         <xsl:variable name="idref">
-            <!--<xsl:if test="$includeIDs and not(parent::mei:chord)">
+            <xsl:if test="$internalIncludeIDs and not(parent::mei:chord)">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),@xml:id,codepoints-to-string(34),'!')"/>
-            </xsl:if>-->
+            </xsl:if>
         </xsl:variable>
         <xsl:variable name="graceStart">
             <xsl:if test="@grace and not(preceding-sibling::mei:note[1]/@grace)">
                 <xsl:value-of select="concat('{',if(@stem.mod) then('/') else(''))"/>
             </xsl:if>
         </xsl:variable>
+        <xsl:variable name="mark">
+            <xsl:if test="@added and not(ancestor::mei:chord)">
+                <xsl:value-of select="'!mark!'"/>
+            </xsl:if>
+        </xsl:variable>
         <xsl:variable name="hairpin">
-            <xsl:variable name="beginHairpin" select="$measure/mei:hairpin[@startid/substring(.,2) = $id]"/>
-            <xsl:variable name="localEndHairpin" select="$measure/mei:hairpin[@tstamp2 = $tstamp]"/>
-            <xsl:variable name="distantEndHairpin" select="$measure/preceding-sibling::mei:measure/mei:hairpin[local:resolveTstamp2(./parent::mei:measure,$measure,$tstamp, @tstamp2)]"/>
-            <!--<xsl:variable name="endHairpin" select="$localEndHairpin | $distantEndHairpin"/>-->
-            <xsl:variable name="endHairpin" select="//mei:hairpin[@endid/substring(.,2) = $id]"/>
-            <xsl:for-each select="$endHairpin">
-                <xsl:variable name="dir" select="if(@form = 'dim') then('diminuendo') else ('crescendo')"/>
-                <xsl:value-of select="concat('!',$dir,')!')"/>
-            </xsl:for-each>
-            <xsl:for-each select="$beginHairpin">
-                <xsl:variable name="dir" select="if(@form = 'dim') then('diminuendo') else ('crescendo')"/>
-                <xsl:value-of select="concat('!',$dir,'(!')"/>
-            </xsl:for-each>
+            <!--<xsl:if test="$layerN = '1'">
+                <xsl:variable name="beginHairpin" select="$measure/mei:hairpin[@staff = $staffN and @tstamp = $tstamp]"/>
+                <xsl:variable name="localEndHairpin" select="$measure/mei:hairpin[@staff = $staffN and @tstamp2 = $tstamp]"/>
+                <xsl:variable name="distantEndHairpin" select="$measure/preceding-sibling::mei:measure/mei:hairpin[@staff = $staffN and local:resolveTstamp2(./parent::mei:measure,$measure,$tstamp, @tstamp2)]"/>
+                <!-\-<xsl:variable name="endHairpin" select="$localEndHairpin | $distantEndHairpin"/>-\->
+                <!-\-            <xsl:variable name="endHairpin" select="//mei:hairpin[@endid/substring(.,2) = $id]"/>-\->
+                <xsl:for-each select="$localEndHairpin">
+                    <xsl:variable name="dir" select="if(@form = 'dim') then('diminuendo') else ('crescendo')"/>
+                    <xsl:value-of select="concat('!',$dir,')!')"/>
+                </xsl:for-each>
+                <xsl:for-each select="$beginHairpin">
+                    <xsl:variable name="dir" select="if(@form = 'dim') then('diminuendo') else ('crescendo')"/>
+                    <xsl:value-of select="concat('!',$dir,'(!')"/>
+                </xsl:for-each>
+            </xsl:if>-->
+        </xsl:variable>
+        <xsl:variable name="stemDir">
+            <xsl:if test="$internalShowStemDir and @stem.dir">
+                <xsl:value-of select="concat('&#34;',if(@stem.dir='up') then('⇡') else('⇣'),'&#34;')"/>
+            </xsl:if>
         </xsl:variable>
         <xsl:variable name="dynam">
             <xsl:if test="not(ancestor::mei:chord)">
@@ -378,7 +592,10 @@
         <xsl:variable name="artic">
             <xsl:choose>
                 <xsl:when test="@artic = 'stacc'">.</xsl:when>
+                <xsl:when test="@artic = 'dot'">.</xsl:when>
                 <xsl:when test="@artic = 'acc'">!accent!</xsl:when>
+                <xsl:when test="@artic = 'stroke'">!breath!</xsl:when>
+                <xsl:when test="@artic = 'marc'">!breath!</xsl:when>
             </xsl:choose>
         </xsl:variable>
         <xsl:variable name="trill">
@@ -444,7 +661,7 @@
             </xsl:if>
         </xsl:variable>
         <xsl:variable name="tie">
-            <xsl:if test="starts-with(@tie,'i')">-</xsl:if>
+            <xsl:if test="starts-with(@tie,'i') or starts-with(@tie,'m')">-</xsl:if>
         </xsl:variable>
         <xsl:variable name="slurEnd">
             <xsl:for-each select="//mei:slur[substring(@endid,2) = $id]">)</xsl:for-each>
@@ -453,25 +670,54 @@
             <xsl:if test="@grace and not(following-sibling::mei:note[1]/@grace)">}</xsl:if>
         </xsl:variable>
         <xsl:variable name="tstamp">
-            <!--<xsl:if test="$showTstamps">
+            <!--<xsl:if test="$internalShowTstamps">
                 <xsl:value-of select="concat(codepoints-to-string(34),$tstamp,codepoints-to-string(34))"/>
             </xsl:if>-->
         </xsl:variable>
-        <xsl:value-of select="concat(' ',$idref,$tstamp,$hairpin,$graceStart,$slurStart,$stemMod,$dynam,$trill,$fermata,$artic,$accid,$pitch,$dur,$tie,$slurEnd,$graceEnd)"/>
+        <xsl:value-of select="concat(' ',$idref,$tstamp,$hairpin,$mark,$stemDir,$graceStart,$slurStart,$stemMod,$dynam,$trill,$fermata,$artic,$accid,$pitch,$dur,$tie,$slurEnd,$graceEnd)"/>
     </xsl:template>
     <xsl:template match="mei:rest" mode="convertMEI">
+        <xsl:variable name="tstamp" select="local:getTstamp(.) cast as xs:string"/>
+        <xsl:variable name="staffN" select="ancestor::mei:staff/@n"/>
+        <xsl:variable name="layerN" select="ancestor::mei:layer/@n"/>
+        <xsl:variable name="measure" select="ancestor::mei:measure"/>
         <xsl:variable name="idref">
-            <!--<xsl:if test="$includeIDs">
+            <xsl:if test="$internalIncludeIDs">
                 <xsl:value-of select="concat('!xml:id=',codepoints-to-string(34),@xml:id,codepoints-to-string(34),'!')"/>
-            </xsl:if>-->
+            </xsl:if>
         </xsl:variable>
         <xsl:variable name="fermata">
             <xsl:if test="@fermata">
                 <xsl:value-of select="concat('!',if(@fermata = 'above') then('fermata') else('invertedfermata'),'!')"/>
             </xsl:if>
         </xsl:variable>
+        <xsl:variable name="mark">
+            <xsl:if test="@added or ancestor::mei:*[@added]">
+                <xsl:value-of select="'!mark!'"/>
+            </xsl:if>
+        </xsl:variable>
+        <xsl:variable name="hairpin">
+            <!--<xsl:if test="$layerN = '1'">
+                <xsl:variable name="beginHairpin" select="$measure/mei:hairpin[@staff = $staffN and @tstamp = $tstamp]"/>
+                <xsl:variable name="localEndHairpin" select="$measure/mei:hairpin[@staff = $staffN and @tstamp2 = $tstamp]"/>
+                <xsl:variable name="distantEndHairpin" select="$measure/preceding-sibling::mei:measure/mei:hairpin[@staff = $staffN and local:resolveTstamp2(./parent::mei:measure,$measure,$tstamp, @tstamp2)]"/>
+                <!-\-<xsl:variable name="endHairpin" select="$localEndHairpin | $distantEndHairpin"/>-\->
+                <!-\-            <xsl:variable name="endHairpin" select="//mei:hairpin[@endid/substring(.,2) = $id]"/>-\->
+                <xsl:for-each select="$localEndHairpin | $distantEndHairpin">
+                    <xsl:variable name="dir" select="if(@form = 'dim') then('diminuendo') else ('crescendo')"/>
+                    <xsl:value-of select="concat('!',$dir,')!')"/>
+                </xsl:for-each>
+                <xsl:for-each select="$beginHairpin">
+                    <xsl:variable name="dir" select="if(@form = 'dim') then('diminuendo') else ('crescendo')"/>
+                    <xsl:value-of select="concat('!',$dir,'(!')"/>
+                </xsl:for-each>
+            </xsl:if>-->
+        </xsl:variable>
         <xsl:variable name="dur" select="local:resolveDur(@dur,if(@dots) then(@dots) else(''))"/>
-        <xsl:value-of select="concat(' ',$idref,$fermata,'z',$dur)"/>
+        <xsl:value-of select="concat(' ',$idref,$fermata,$mark,$hairpin,'z',$dur)"/>
+    </xsl:template>
+    <xsl:template match="mei:clef[@line and @shape]" mode="convertMEI">
+        <xsl:value-of select="concat('[K:',local:translateClef(@line,@shape),']')"/>
     </xsl:template>
     <xsl:template match="mei:space" mode="convertMEI">
         <xsl:variable name="dur" select="local:resolveDur(@dur,if(@dots) then(@dots) else(''))"/>
@@ -684,8 +930,8 @@
         </xsl:choose>
     </xsl:function>
     <xsl:function name="local:translateMeter">
-        <xsl:param name="meter.count" as="xs:string"/>
-        <xsl:param name="meter.unit" as="xs:string"/>
+        <xsl:param name="meter.count" as="xs:string?"/>
+        <xsl:param name="meter.unit" as="xs:string?"/>
         <xsl:param name="meter.sym" as="xs:string?"/>
         <xsl:choose>
             <xsl:when test="$meter.sym = 'common'">C</xsl:when>
@@ -701,7 +947,6 @@
     <xsl:function name="local:translateClef">
         <xsl:param name="clef.line" as="xs:string"/>
         <xsl:param name="clef.shape" as="xs:string"/>
-        
         <xsl:variable name="clefDef" select="concat(upper-case($clef.shape),$clef.line)"/>
         <xsl:variable name="clefString">
             <xsl:choose>
@@ -717,7 +962,6 @@
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:variable>
-        
         <xsl:value-of select="concat(' clef=',$clefString)"/>
     </xsl:function>
     <xsl:function name="local:getTstamp">
@@ -808,7 +1052,7 @@
         <xsl:variable name="clef">
             <xsl:choose>
                 <xsl:when test="$elem//mei:staffDef[@clef.line and @clef.shape]">
-                    <xsl:variable name="child" select="$elem//mei:staffDef"/>
+                    <xsl:variable name="child" select="$elem//mei:staffDef[@clef.line and @clef.shape]"/>
                     <xsl:value-of select="local:translateClef($child/@clef.line, $child/@clef.shape)"/>
                 </xsl:when>
                 <xsl:otherwise>
@@ -838,6 +1082,49 @@
         <xsl:if test="$meter != ''">
             <xsl:value-of select="concat($start,'M:',$meter,$end)"/>
         </xsl:if>
+    </xsl:function>
+    <xsl:function name="local:getTstampByDef">
+        <xsl:param name="elem"/>
+        <xsl:param name="def"/>
+        <xsl:variable name="eventid" select="$elem/@xml:id"/>
+        <xsl:variable name="layer" select="$elem/ancestor::mei:layer"/>
+        <xsl:variable name="meter.unit" select="$def/@meter.unit"/>
+        <xsl:variable name="meter.count" select="$def/@meter.count"/>
+        
+        <!--  Given a context layer and an @xml:id of a note or rest, 
+                    return the timestamp of the note or rest.-->
+        <xsl:variable name="base" select="number($meter.unit)"/>
+        <xsl:variable name="events">
+            <xsl:for-each select="$layer/descendant::mei:space[@dur] | $layer/descendant::mei:note[@dur] | $layer/descendant::mei:rest | $layer/descendant::mei:chord[@dur and not(.//mei:note[@dur])]">
+                <!-- Other events that should be considered? -->
+                <local:event>
+                    <xsl:if test="$eventid = @xml:id">
+                        <xsl:attribute name="this">this</xsl:attribute>
+                    </xsl:if>
+                    <xsl:value-of select="1 div @dur"/>
+                </local:event>
+                <xsl:if test="@dots">
+                    <xsl:variable name="total" select="@dots"/>
+                    <xsl:variable name="dur" select="@dur"/>
+                    <xsl:call-template name="add_dots">
+                        <xsl:with-param name="dur" select="$dur"/>
+                        <xsl:with-param name="total" select="$total"/>
+                    </xsl:call-template>
+                </xsl:if>
+                <xsl:if test="descendant::dot">
+                    <xsl:variable name="total" select="count(descendant::dot)"/>
+                    <xsl:variable name="dur" select="@dur"/>
+                    <xsl:call-template name="add_dots">
+                        <xsl:with-param name="dur" select="$dur"/>
+                        <xsl:with-param name="total" select="$total"/>
+                    </xsl:call-template>
+                </xsl:if>
+            </xsl:for-each>
+        </xsl:variable>
+        <!--DEBUG<xsl:copy-of select="$events"/>-->
+        
+        <!--<xsl:value-of select="count($events//local:event[@this])"/>-->
+        <xsl:value-of select="(sum($events//local:event[@this]/preceding::local:event) div (1 div $base))+1"/>
     </xsl:function>
     <xsl:template match="node() | @*" mode="test">
         <xsl:message select="concat('processing ',local-name(.))"/>
